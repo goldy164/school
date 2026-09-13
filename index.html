@@ -1,75 +1,160 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import sqlite3
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>شات أولى إعدادي - المباشر</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        header { background: #1e293b; padding: 15px; text-align: center; font-size: 20px; font-weight: bold; border-bottom: 2px solid #334155; }
+        #login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 15px; }
+        #login-screen input { padding: 10px; font-size: 16px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: white; width: 250px; text-align: center; }
+        #login-screen button { padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+        
+        #chat-screen { display: none; flex-direction: column; flex: 1; max-width: 800px; width: 100%; margin: 0 auto; overflow: hidden; }
+        #chat-box { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; }
+        .message { background: #1e293b; padding: 10px 15px; border-radius: 10px; max-width: 75%; word-break: break-word; border: 1px solid #334155; }
+        .message.mine { background: #2563eb; align-self: flex-start; }
+        .message .user { font-size: 12px; color: #94a3b8; margin-bottom: 4px; font-weight: bold; }
+        
+        #input-box { display: flex; padding: 15px; background: #1e293b; border-top: 2px solid #334155; gap: 10px; }
+        #input-box input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: white; font-size: 16px; }
+        #input-box button { padding: 10px 20px; background: #22c55e; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
 
-app = Flask(__name__)
-CORS(app)
+    <header>💬 شات أولى إعدادي - المباشر</header>
 
-# --- تهيئة قاعدة البيانات للـ PS4 والشات ---
-def init_db():
-    conn = sqlite3.connect('users.db')
-    cursor = conn.cursor()
-    # جدول الحسابات القديم (الخاص بمشروعك)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL
-        )
-    ''')
-    # جدول رسائل الشات الجماعي الجديد
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL,
-            message TEXT NOT NULL,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    <!-- شاشة تسجيل الاسم -->
+    <div id="login-screen">
+        <h2>اكتب اسمك عشان تدخل الشات</h2>
+        <input type="text" id="username-input" placeholder="اسمك الكريم...">
+        <button onclick="startChat()">دخول الشات 🚀</button>
+    </div>
 
-init_db()
+    <!-- شاشة الشات الرئيسية -->
+    <div id="chat-screen">
+        <div id="chat-box" onscroll="checkScroll()"></div>
+        <div id="input-box">
+            <input type="text" id="message-input" placeholder="اكتب رسالتك هنا..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendMessage()">إرسال</button>
+        </div>
+    </div>
 
-# ==========================================
-# 1. مسارات الشات الجماعي للفصل (Group Chat)
-# ==========================================
+    <script>
+        let username = "";
+        let oldestMessageId = null;
+        let isFetchingOld = false;
+        let lastMaxId = 0;
 
-@app.route('/api/chat/send', methods=['POST'])
-def send_chat_message():
-    data = request.json
-    username = data.get('username')
-    message = data.get('message')
+        function startChat() {
+            const input = document.getElementById("username-input").value.trim();
+            if (!input) {
+                alert("الرجاء إدخال الاسم أولاً!");
+                return;
+            }
+            username = input;
+            document.getElementById("login-screen").style.display = "none";
+            document.getElementById("chat-screen").style.display = "flex";
+            loadInitialMessages();
+            setInterval(pollNewMessages, 1000);
+        }
 
-    if not username or not message:
-        return jsonify({"status": "error", "message": "الاسم والرسالة مطلوبان"}), 400
+        const chatBox = document.getElementById("chat-box");
 
-    conn = sqlite3.connect('users.db')
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO messages (username, message) VALUES (?, ?)", (username, message))
-    conn.commit()
-    conn.close()
+        async function loadInitialMessages() {
+            try {
+                const res = await fetch('https://VigitoSon.pythonanywhere.com/api/chat/messages?limit=20');
+                const messages = await res.json();
+                chatBox.innerHTML = "";
+                if (messages.length > 0) {
+                    oldestMessageId = messages[0].id;
+                    messages.forEach(msg => appendMessage(msg));
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                    lastMaxId = messages[messages.length - 1].id;
+                }
+            } catch (err) {
+                console.log("خطأ في التحميل:", err);
+            }
+        }
 
-    return jsonify({"status": "success", "message": "تم إرسال الرسالة"})
+        async function pollNewMessages() {
+            if (!username) return;
+            try {
+                const res = await fetch(`https://VigitoSon.pythonanywhere.com/api/chat/messages?limit=10`);
+                const messages = await res.json();
+                if (messages.length > 0) {
+                    const latest = messages[messages.length - 1];
+                    if (latest.id > lastMaxId) {
+                        messages.forEach(msg => {
+                            if (msg.id > lastMaxId) {
+                                appendMessage(msg);
+                                lastMaxId = msg.id;
+                            }
+                        });
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                    }
+                }
+            } catch (err) {
+                console.log("خطأ في التحديث:", err);
+            }
+        }
 
-@app.route('/api/chat/messages', methods=['GET'])
-def get_chat_messages():
-    limit = int(request.args.get('limit', 20))
-    before_id = request.args.get('before_id', None)
+        async function sendMessage() {
+            const inputField = document.getElementById("message-input");
+            const message = inputField.value.trim();
+            if (!message) return;
 
-    conn = sqlite3.connect('users.db')
-    cursor = conn.cursor()
+            try {
+                await fetch('https://VigitoSon.pythonanywhere.com/api/chat/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: username, message: message })
+                });
+                inputField.value = "";
+                pollNewMessages();
+            } catch (err) {
+                alert("فشل إرسال الرسالة!");
+            }
+        }
 
-    if before_id:
-        cursor.execute("SELECT id, username, message, timestamp FROM messages WHERE id < ? ORDER BY id DESC LIMIT ?", (before_id, limit))
-    else:
-        cursor.execute("SELECT id, username, message, timestamp FROM messages ORDER BY id DESC LIMIT ?", (limit,))
-    
-    rows = cursor.fetchall()
-    conn.close()
+        function appendMessage(msg) {
+            const div = document.createElement("div");
+            div.className = "message" + (msg.username === username ? " mine" : "");
+            div.innerHTML = `<div class="user">${msg.username}</div><div class="text">${msg.message}</div>`;
+            chatBox.appendChild(div);
+        }
 
-    messages = [{"id": r[0], "username": r[1], "message": r[2], "timestamp": r[3]} for r in reversed(rows)]
-    return jsonify(messages)
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
 
-if __name__ == '__main__':
-    app.run(debug=True)
+        async function checkScroll() {
+            if (chatBox.scrollTop === 0 && !isFetchingOld && oldestMessageId) {
+                isFetchingOld = true;
+                const prevHeight = chatBox.scrollHeight;
+                
+                try {
+                    const res = await fetch(`https://VigitoSon.pythonanywhere.com/api/chat/messages?limit=15&before_id=${oldestMessageId}`);
+                    const olderMessages = await res.json();
+                    
+                    if (olderMessages.length > 0) {
+                        oldestMessageId = olderMessages[0].id;
+                        olderMessages.forEach(msg => {
+                            const div = document.createElement("div");
+                            div.className = "message" + (msg.username === username ? " mine" : "");
+                            div.innerHTML = `<div class="user">${msg.username}</div><div class="text">${msg.message}</div>`;
+                            chatBox.insertBefore(div, chatBox.firstChild);
+                        });
+                        chatBox.scrollTop = chatBox.scrollHeight - prevHeight;
+                    }
+                } catch (err) {
+                    console.log("خطأ في جلب القديم:", err);
+                }
+                isFetchingOld = false;
+            }
+        }
+    </script>
+</body>
+</html>
