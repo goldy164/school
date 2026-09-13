@@ -84,9 +84,9 @@
                 const res = await fetch('https://VigitoSon.pythonanywhere.com/api/chat/messages?limit=20');
                 const messages = await res.json();
                 
-                // تنظيف الشات مع الحفاظ على زر التحميل فوق
-                const existingBtn = loadMoreBtn.outerHTML;
-                chatBox.innerHTML = existingBtn;
+                // تفريغ الرسائل القديمة في الشات مع إبقاء زر التحميل في أول العناصر
+                chatBox.innerHTML = '';
+                chatBox.appendChild(loadMoreBtn);
 
                 if (messages.length > 0) {
                     oldestMessageId = messages[0].id;
@@ -96,11 +96,11 @@
                     scrollToBottom();
                 }
                 
-                // إظهار زر الرسائل السابقة دائماً طالما جاب 20 رسالة (يعني غالباً في قديم)
+                // لو عدد الرسائل 20، معناه غالباً فيه رسائل أقدم تظهر الزرار، لو أقل نخفيه
                 if (messages.length >= 20) {
-                    document.getElementById("load-more-btn").style.display = "block";
+                    loadMoreBtn.style.display = "block";
                 } else {
-                    document.getElementById("load-more-btn").style.display = "none";
+                    loadMoreBtn.style.display = "none";
                 }
             } catch (err) {
                 console.log("خطأ في التحميل:", err);
@@ -117,7 +117,7 @@
                     oldestMessageId = olderMessages[0].id;
                     const prevHeight = chatBox.scrollHeight;
 
-                    // إضافة الرسائل القديمة تحت زر التحميل مباشرة
+                    // إدراج الرسائل القديمة بعد زر التحميل مباشرة
                     olderMessages.reverse().forEach(msg => {
                         const div = document.createElement("div");
                         div.className = "message" + (msg.username === username ? " mine" : "");
@@ -125,10 +125,15 @@
                         loadMoreBtn.after(div);
                     });
 
-                    // الحفاظ على مكان السكرول عشان الصفحة مهتتطش فوق خالص
+                    // الحفاظ على مكان السكرول عشان الصفحة ما تهتز
                     chatBox.scrollTop = chatBox.scrollHeight - prevHeight;
+
+                    // لو اللي اتجابه أقل من 20، يبقى خلصنا الرسائل القديمة كلها
+                    if (olderMessages.length < 20) {
+                        loadMoreBtn.style.display = "none";
+                    }
                 } else {
-                    document.getElementById("load-more-btn").style.display = "none";
+                    loadMoreBtn.style.display = "none";
                 }
             } catch (err) {
                 console.log("خطأ في جلب الرسائل القديمة:", err);
@@ -149,7 +154,6 @@
                                 lastMaxId = msg.id;
                             }
                         });
-                        // لو المستخدم قريب من تحت، انزل تلقائي للرسالة الجديدة
                         if (chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 150) {
                             scrollToBottom();
                         }
@@ -179,7 +183,7 @@
             }
         }
 
-    function appendMessage(msg, isNew) {
+        function appendMessage(msg, isNew) {
             const div = document.createElement("div");
             div.className = "message" + (msg.username === username ? " mine" : "");
             div.innerHTML = `<div class="user">${msg.username}</div><div class="text">${msg.message}</div>`;
@@ -192,7 +196,6 @@
         }
 
         function checkScrollPosition() {
-            // لو طلعت فوق، ممكن تظهر الزرار بتاع النزول لو أردت، أو تسيبه يظهر لو بعيد عن القاع
             if (chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight > 300) {
                 scrollDownBtn.style.display = "flex";
             } else {
