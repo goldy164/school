@@ -113,6 +113,7 @@
                     body: JSON.stringify({ username: username, message: message })
                 });
                 inputField.value = "";
+                pollNewNames = "";
                 pollNewMessages();
             } catch (err) {
                 alert("فشل إرسال الرسالة!");
