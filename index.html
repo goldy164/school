@@ -5,21 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>شات أولى إعدادي - المباشر</title>
     <style>
+        * { box-sizing: border-box; }
         body { font-family: Tahoma, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; display: flex; flex-direction: column; height: 100vh; }
         header { background: #1e293b; padding: 15px; text-align: center; font-size: 20px; font-weight: bold; border-bottom: 2px solid #334155; }
-        #login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 15px; }
-        #login-screen input { padding: 10px; font-size: 16px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: white; width: 250px; text-align: center; }
-        #login-screen button { padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
         
-        #chat-screen { display: none; flex-direction: column; flex: 1; max-width: 800px; width: 100%; margin: 0 auto; overflow: hidden; }
+        #login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 15px; }
+        #login-screen input { padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: white; width: 280px; text-align: center; outline: none; }
+        #login-screen button { padding: 12px 25px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold; }
+        
+        #chat-screen { display: none; flex-direction: column; flex: 1; max-width: 800px; width: 100%; margin: 0 auto; overflow: hidden; position: relative; }
         #chat-box { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; }
+        
+        /* زر تحميل الرسائل القديمة */
+        #load-more-btn { background: #334155; color: #cbd5e1; border: none; padding: 8px 15px; border-radius: 20px; font-size: 13px; cursor: pointer; align-self: center; margin-bottom: 10px; display: none; }
+        #load-more-btn:hover { background: #475569; }
+
         .message { background: #1e293b; padding: 10px 15px; border-radius: 10px; max-width: 75%; word-break: break-word; border: 1px solid #334155; }
         .message.mine { background: #2563eb; align-self: flex-start; }
         .message .user { font-size: 12px; color: #94a3b8; margin-bottom: 4px; font-weight: bold; }
         
+        /* زر النزول للأسفل العائم على الجنب */
+        #scroll-down-btn { position: absolute; bottom: 80px; left: 20px; background: #3b82f6; color: white; border: none; border-radius: 50%; width: 45px; height: 45px; font-size: 20px; cursor: pointer; display: none; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        
         #input-box { display: flex; padding: 15px; background: #1e293b; border-top: 2px solid #334155; gap: 10px; }
-        #input-box input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: white; font-size: 16px; }
-        #input-box button { padding: 10px 20px; background: #22c55e; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+        #input-box input { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: white; font-size: 16px; outline: none; }
+        #input-box button { padding: 12px 20px; background: #22c55e; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -35,7 +45,13 @@
 
     <!-- شاشة الشات الرئيسية -->
     <div id="chat-screen">
-        <div id="chat-box" onscroll="checkScroll()"></div>
+        <div id="chat-box" onscroll="checkScrollPosition()">
+            <button id="load-more-btn" onclick="loadOlderMessages()">⬆️ مشاهدة 20 رسالة قبلها</button>
+        </div>
+        
+        <!-- زر النزول للأسفل -->
+        <button id="scroll-down-btn" onclick="scrollToBottom()">⬇️</button>
+
         <div id="input-box">
             <input type="text" id="message-input" placeholder="اكتب رسالتك هنا..." onkeypress="handleKeyPress(event)">
             <button onclick="sendMessage()">إرسال</button>
@@ -45,8 +61,10 @@
     <script>
         let username = "";
         let oldestMessageId = null;
-        let isFetchingOld = false;
         let lastMaxId = 0;
+        const chatBox = document.getElementById("chat-box");
+        const loadMoreBtn = document.getElementById("load-more-btn");
+        const scrollDownBtn = document.getElementById("scroll-down-btn");
 
         function startChat() {
             const input = document.getElementById("username-input").value.trim();
@@ -58,24 +76,59 @@
             document.getElementById("login-screen").style.display = "none";
             document.getElementById("chat-screen").style.display = "flex";
             loadInitialMessages();
-            setInterval(pollNewMessages, 1000);
+            setInterval(pollNewMessages, 2000);
         }
-
-        const chatBox = document.getElementById("chat-box");
 
         async function loadInitialMessages() {
             try {
                 const res = await fetch('https://VigitoSon.pythonanywhere.com/api/chat/messages?limit=20');
                 const messages = await res.json();
-                chatBox.innerHTML = "";
+                
+                // تنظيف الشات مع الحفاظ على زر التحميل فوق
+                const existingBtn = loadMoreBtn.outerHTML;
+                chatBox.innerHTML = existingBtn;
+
                 if (messages.length > 0) {
                     oldestMessageId = messages[0].id;
-                    messages.forEach(msg => appendMessage(msg));
-                    chatBox.scrollTop = chatBox.scrollHeight;
                     lastMaxId = messages[messages.length - 1].id;
+                    
+                    messages.forEach(msg => appendMessage(msg, false));
+                    scrollToBottom();
+                    
+                    if (messages.length >= 20) {
+                        document.getElementById("load-more-btn").style.display = "block";
+                    }
                 }
             } catch (err) {
                 console.log("خطأ في التحميل:", err);
+            }
+        }
+
+        async function loadOlderMessages() {
+            if (!oldestMessageId) return;
+            try {
+                const res = await fetch(`https://VigitoSon.pythonanywhere.com/api/chat/messages?limit=20&before_id=${oldestMessageId}`);
+                const olderMessages = await res.json();
+
+                if (olderMessages.length > 0) {
+                    oldestMessageId = olderMessages[0].id;
+                    const prevHeight = chatBox.scrollHeight;
+
+                    // إضافة الرسائل القديمة تحت زر التحميل مباشرة
+                    olderMessages.reverse().forEach(msg => {
+                        const div = document.createElement("div");
+                        div.className = "message" + (msg.username === username ? " mine" : "");
+                        div.innerHTML = `<div class="user">${msg.username}</div><div class="text">${msg.message}</div>`;
+                        loadMoreBtn.after(div);
+                    });
+
+                    // الحفاظ على مكان السكرول عشان الصفحة مهتتطش فوق خالص
+                    chatBox.scrollTop = chatBox.scrollHeight - prevHeight;
+                } else {
+                    document.getElementById("load-more-btn").style.display = "none";
+                }
+            } catch (err) {
+                console.log("خطأ في جلب الرسائل القديمة:", err);
             }
         }
 
@@ -89,11 +142,14 @@
                     if (latest.id > lastMaxId) {
                         messages.forEach(msg => {
                             if (msg.id > lastMaxId) {
-                                appendMessage(msg);
+                                appendMessage(msg, true);
                                 lastMaxId = msg.id;
                             }
                         });
-                        chatBox.scrollTop = chatBox.scrollHeight;
+                        // لو المستخدم قريب من تحت، انزل تلقائي للرسالة الجديدة
+                        if (chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 150) {
+                            scrollToBottom();
+                        }
                     }
                 }
             } catch (err) {
@@ -113,48 +169,36 @@
                     body: JSON.stringify({ username: username, message: message })
                 });
                 inputField.value = "";
-                pollNewNames = "";
                 pollNewMessages();
+                setTimeout(scrollToBottom, 200);
             } catch (err) {
                 alert("فشل إرسال الرسالة!");
             }
         }
 
-        function appendMessage(msg) {
+    function appendMessage(msg, isNew) {
             const div = document.createElement("div");
             div.className = "message" + (msg.username === username ? " mine" : "");
             div.innerHTML = `<div class="user">${msg.username}</div><div class="text">${msg.message}</div>`;
             chatBox.appendChild(div);
         }
 
-        function handleKeyPress(e) {
-            if (e.key === 'Enter') sendMessage();
+        function scrollToBottom() {
+            chatBox.scrollTop = chatBox.scrollHeight;
+            scrollDownBtn.style.display = "none";
         }
 
-        async function checkScroll() {
-            if (chatBox.scrollTop === 0 && !isFetchingOld && oldestMessageId) {
-                isFetchingOld = true;
-                const prevHeight = chatBox.scrollHeight;
-                
-                try {
-                    const res = await fetch(`https://VigitoSon.pythonanywhere.com/api/chat/messages?limit=15&before_id=${oldestMessageId}`);
-                    const olderMessages = await res.json();
-                    
-                    if (olderMessages.length > 0) {
-                        oldestMessageId = olderMessages[0].id;
-                        olderMessages.forEach(msg => {
-                            const div = document.createElement("div");
-                            div.className = "message" + (msg.username === username ? " mine" : "");
-                            div.innerHTML = `<div class="user">${msg.username}</div><div class="text">${msg.message}</div>`;
-                            chatBox.insertBefore(div, chatBox.firstChild);
-                        });
-                        chatBox.scrollTop = chatBox.scrollHeight - prevHeight;
-                    }
-                } catch (err) {
-                    console.log("خطأ في جلب القديم:", err);
-                }
-                isFetchingOld = false;
+        function checkScrollPosition() {
+            // لو طلعت فوق، ممكن تظهر الزرار بتاع النزول لو أردت، أو تسيبه يظهر لو بعيد عن القاع
+            if (chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight > 300) {
+                scrollDownBtn.style.display = "flex";
+            } else {
+                scrollDownBtn.style.display = "none";
             }
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') sendMessage();
         }
     </script>
 </body>
