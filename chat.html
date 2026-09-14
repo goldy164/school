@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>شات أولى إعدادي - المباشر</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <div class="title-area">
+            <div class="title">💬 شات أولى إعدادي</div>
+            <div class="status">متصل الآن</div>
+        </div>
+    </header>
+
+    <!-- شاشة الشات الرئيسية -->
+    <div id="chat-screen" style="display: flex;">
+        <div id="chat-box">
+            <button id="load-more-btn" onclick="loadOlderMessages()">⬆️ تحميل رسائل أقدم</button>
+        </div>
+        
+        <!-- زر النزول للأسفل -->
+        <button id="scroll-down-btn" onclick="scrollToBottom()">⬇️</button>
+
+        <div id="input-box">
+            <input type="text" id="message-input" placeholder="اكتب رسالتك هنا..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendMessage()">✈️</button>
+        </div>
+    </div>
+
+    <!-- ربط ملف الجافاسكريبت الخاص بالشات -->
+    <script src="script.logics.js"></script>
+</body>
+</html>
