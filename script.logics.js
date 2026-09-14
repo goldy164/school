@@ -19,20 +19,27 @@ async function loadInitialMessages() {
         const res = await fetch('https://VigitoSon.pythonanywhere.com/api/chat/messages?limit=20');
         const messages = await res.json();
         
-        chatBox.innerHTML = '';
-        chatBox.appendChild(loadMoreBtn);
+        if (chatBox) {
+            // تفريغ الشاشة مع الحفاظ على زر التحميل القديم أو إضافته بأمان
+            chatBox.innerHTML = '';
+            if (loadMoreBtn) {
+                chatBox.appendChild(loadMoreBtn);
+            }
 
-        if (messages.length > 0) {
-            oldestMessageId = messages[0].id;
-            lastMaxId = messages[messages.length - 1].id;
+            if (Array.isArray(messages) && messages.length > 0) {
+                oldestMessageId = messages[0].id;
+                lastMaxId = messages[messages.length - 1].id;
+                
+                messages.forEach(msg => appendMessage(msg));
+                scrollToBottom();
+            }
             
-            messages.forEach(msg => appendMessage(msg));
-            scrollToBottom();
+            if (loadMoreBtn) {
+                loadMoreBtn.style.display = (Array.isArray(messages) && messages.length >= 20) ? "block" : "none";
+            }
         }
-        
-        loadMoreBtn.style.display = messages.length >= 20 ? "block" : "none";
     } catch (err) {
-        console.log("خطأ في التحميل:",[span_1](start_span)[span_1](end_span) err);
+        console.log("خطأ في التحميل:", err);
     }
 }
 
@@ -57,7 +64,7 @@ async function loadOlderMessages() {
             loadMoreBtn.style.display = "none";
         }
     } catch (err) {
-        console.log("خطأ في الرسائل القديمة:",[span_2](start_span)[span_2](end_span) err);
+        console.log("خطأ في الرسائل القديمة:", err);
     }
 }
 
@@ -81,7 +88,7 @@ async function pollNewMessages() {
             }
         }
     } catch (err) {
-        console.log("خطأ في التحديث:",[span_3](start_span)[span_3](end_span) err);
+        console.log("خطأ في التحديث:", err);
     }
 }
 
