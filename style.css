@@ -1,0 +1,20 @@
+/* تنسيق زر الحذف */
+.delete-msg-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    padding: 4px;
+}
+
+/* إظهار زر الحذف بسلاسة عند الوقوف على صف الرسالة */
+.message-row:hover .delete-msg-btn {
+    opacity: 0.7;
+}
+
+.delete-msg-btn:hover {
+    opacity: 1 !important;
+    transform: scale(1.2);
+}
